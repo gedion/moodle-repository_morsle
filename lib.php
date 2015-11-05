@@ -30,13 +30,13 @@ require_once("$CFG->dirroot/repository/morsle/locallib.php");
 require_once("$CFG->dirroot/repository/lib.php");
 require_once("$CFG->dirroot/google/gauth.php");
 require_once("$CFG->dirroot/google/lib.php");
-require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service.php";
-require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Resource.php";
-require_once($CFG->dirroot.'/google/google-api-php-client/src/Google/Http/Batch.php');
-require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Calendar.php";
-require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Directory.php";
-require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Drive.php";
-require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Client.php";
+require_once "$CFG->dirroot/lib/google/src/Google/Service.php";
+require_once "$CFG->dirroot/lib/google/src/Google/Service/Resource.php";
+require_once($CFG->dirroot.'/lib/google/src/Google/Http/Batch.php');
+require_once "$CFG->dirroot/lib/google/src/Google/Service/Calendar.php";
+require_once "$CFG->dirroot/lib/google/src/Google/Service/Directory.php";
+require_once "$CFG->dirroot/lib/google/src/Google/Service/Drive.php";
+require_once "$CFG->dirroot/lib/google/src/Google/Client.php";
 
 class repository_morsle extends repository {
     private $subauthtoken = '';
