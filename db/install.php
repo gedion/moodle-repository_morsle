@@ -31,7 +31,7 @@
 
 defined('MOODLE_INTERNAL') || die;
 
-function xmldb_morsle_install() {
+function xmldb_repository_morsle_install() {
     global $CFG;
 
 }
