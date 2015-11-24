@@ -62,10 +62,9 @@ class repository_morsle extends repository {
         $this->curtime = time();
         // set basefeeds
         $this->user_auth = "https://www.googleapis.com/auth/admin.directory.user";
-        $this->site_feed = "https://sites.google.com/feeds/site/$this->domain";
         $this->drive_auth = 'https://www.googleapis.com/auth/drive ';
         $this->file_auth = 'https://www.googleapis.com/auth/drive.file ';
-        $this->alias_feed = "https://apps-apis.google.com/a/feeds/alias/2.0/$this->domain/?start=aaaarnold@luther.edu";
+//        $this->alias_feed = "https://apps-apis.google.com/a/feeds/alias/2.0/$this->domain/?start=aaaarnold@luther.edu";
         $this->group_auth = 'https://www.googleapis.com/auth/admin.directory.group';
         $this->id_feed = 'https://docs.google.com/feeds/id/';
         $this->cal_auth = 'https://www.googleapis.com/auth/calendar';
