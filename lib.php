@@ -51,7 +51,7 @@ class repository_morsle extends repository {
         $this->readonly = $readonly;
         $this->useremail = $COURSE->shortname.'@luther.edu';
 
-        if (!$this->admin = get_config('morsle','google_admin')) {
+        if (!$this->admin = get_config('block_morsle','google_admin')) {
             throw new moodle_exception('Google admin not setup');
         }
         parent::__construct($this->repositoryid, $this->context, $this->options, $this->readonly);
