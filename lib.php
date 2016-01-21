@@ -30,13 +30,13 @@ require_once("$CFG->dirroot/repository/morsle/locallib.php");
 require_once("$CFG->dirroot/repository/lib.php");
 require_once("$CFG->dirroot/google/gauth.php");
 require_once("$CFG->dirroot/google/lib.php");
-require_once "$CFG->dirroot/lib/google/src/Google/Service.php";
-require_once "$CFG->dirroot/lib/google/src/Google/Service/Resource.php";
-require_once($CFG->dirroot.'/lib/google/src/Google/Http/Batch.php');
-require_once "$CFG->dirroot/lib/google/src/Google/Service/Calendar.php";
-require_once "$CFG->dirroot/lib/google/src/Google/Service/Directory.php";
-require_once "$CFG->dirroot/lib/google/src/Google/Service/Drive.php";
-require_once "$CFG->dirroot/lib/google/src/Google/Client.php";
+require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service.php";
+require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Resource.php";
+require_once($CFG->dirroot.'/google/google-api-php-client/src/Google/Http/Batch.php');
+require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Calendar.php";
+require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Directory.php";
+require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Service/Drive.php";
+require_once "$CFG->dirroot/google/google-api-php-client/src/Google/Client.php";
 
 class repository_morsle extends repository {
     private $subauthtoken = '';
@@ -48,12 +48,13 @@ class repository_morsle extends repository {
         $this->repositoryid = $repositoryid;
         $this->context = $context;
         $this->options = $options;
-        $this->readonly = $readonly;
-        $this->useremail = $COURSE->shortname.'@luther.edu';
+	    $this->readonly = $readonly;
+	    $this->useremail = $COURSE->shortname.'@luther.edu';
 
-        if (!$this->admin = get_config('morsle','google_admin')) {
-            throw new moodle_exception('Google admin not setup');
+        if ( !$this->domain = get_config('morsle','consumer_key')) {
+        	throw new moodle_exception('Consumer key not set up');
         }
+
         parent::__construct($this->repositoryid, $this->context, $this->options, $this->readonly);
 
         // days past last enrollment day that morsle resources are retained
@@ -69,8 +70,8 @@ class repository_morsle extends repository {
         $this->group_auth = 'https://www.googleapis.com/auth/admin.directory.group';
         $this->id_feed = 'https://docs.google.com/feeds/id/';
         $this->cal_auth = 'https://www.googleapis.com/auth/calendar';
-        $this->owncalendars_feed = 'https://www.google.com/calendar/feeds/default/owncalendars/full';
-        // skip marked for delete, unapproved and past term
+	    $this->owncalendars_feed = 'https://www.google.com/calendar/feeds/default/owncalendars/full';
+	    // skip marked for delete, unapproved and past term
         $this->disregard = "'Past Term','DELETED'"; 
     }
 
@@ -398,19 +399,16 @@ class repository_morsle extends repository {
             // set this up so it runs at your desired interval
 	    srand ((double) microtime() * 10000000);
 	    $random100 = rand(0,100);
-	    // call the create and destroy Morsle instances functions
-            if ($random100 < 10) {     // Approximately every hour.
+	    if ($random100 < 10) {     // Approximately every hour.
 	        mtrace(date(DATE_ATOM) . " - Running m_cook...");
 			$status = $this->m_cook();
 	        mtrace(date(DATE_ATOM) . " - Done m_cook: $status");
 	    }
-            // call the permissions functions
 	    if ($random100 > 45 && $random100 < 55) {     // Approximately every hour
 	        mtrace(date(DATE_ATOM) . " - Running m_maintain...");
-			$status = $this->m_maintain();
+//			$status = $this->m_maintain();
 	        mtrace(date(DATE_ATOM) . " - Done m_maintain: $status");
 	    }
-            // call the calendar functions
 	    if ($random100 > 90) {     // Approximately every hour.
 	        mtrace(date(DATE_ATOM) . " -Running m_digest...");
 			$status = $this->m_digest();
@@ -499,29 +497,29 @@ class repository_morsle extends repository {
             if (is_null($stat)) {
                 switch ($key) {
                     case 'password': // create user account
-                        $this->useremail = $this->admin;
-                        $this->get_token('user');
+                        $this->useremail = 'admin-moogle@luther.edu';
+//                        $this->get_token('user');
                         $this->revoke_token();
                         $this->get_token('user');
                         $returnval = $this->useradd(); // either password coming back or $response->response
                         break;
                     case 'groupname': // add group
-                        $this->useremail = $this->admin;
-                        $this->get_token('user');
+                        $this->useremail = 'admin-moogle@luther.edu';
+                        $this->get_token('group');
                         $this->revoke_token();
                         $this->get_token('group');
                         $returnval = $this->groupadd($groupname);
                         break;
                     case 'readfolderid': // create readonly folder
                         $this->useremail = $this->shortname . '@luther.edu';
-                        $this->get_token('user');
+                        $this->get_token('drive');
                         $this->revoke_token();
                         $this->get_token('drive');
                         $returnval = createcollection($this, $this->shortname . '-read');
                         break;
                     case 'writefolderid': // create writeable folder
                         $this->useremail = $this->shortname . '@luther.edu';
-                        $this->get_token('user');
+                        $this->get_token('drive');
                         $this->revoke_token();
                         $this->get_token('drive');
                         $returnval = createcollection($this, $this->shortname . '-write');
@@ -734,12 +732,14 @@ class repository_morsle extends repository {
     function m_maintain($course = null) {
         global $CFG, $DB,$COURSE;
         require_once('../../config.php');
+//		$this->get_aliases();
 
         $courseclause = $course != null ? " AND m.shortname = '" .  strtolower($course) .  "'": null;
         $sql = 'SELECT m.*, c.visible as visible, c.category as category from ' . $CFG->prefix . 'morsle_active m
                 JOIN ' . $CFG->prefix . 'course c on m.courseid = c.id
                 WHERE m.status NOT IN(' . $this->disregard . ')
-                AND ((c.startdate + ' . $this->expires . ' > ' . $this->curtime . ') OR c.startdate = 0)'
+                AND ((c.startdate + ' . $this->expires . ' > ' . $this->curtime . ') OR c.startdate = 0)
+                AND c.id > 6412'
                 . $courseclause;
 
         $chewon = $DB->get_records_sql($sql);
@@ -767,7 +767,7 @@ class repository_morsle extends repository {
 
             // maintain members and owners for group
             if (!is_null($this->groupname)) {
-                // replaced $this->admin with $this->shortname as useremail
+                //replaced 'admin-moogle@luther.edu' with $this->shortname as useremail
                 $this->useremail = $this->shortname.'@luther.edu';
                 $this->get_token('group');
                 $this->revoke_token();
@@ -781,7 +781,6 @@ class repository_morsle extends repository {
 
 
         // now we need to substitute real email for alias because folders use real (groups use alias)
-        $this->get_aliases();
         foreach ($rosters as $key=>$value) {
             if (isset($this->aliases[$key])) {
                 $rosters[$this->aliases[$key]] = $value;
@@ -1105,7 +1104,7 @@ class repository_morsle extends repository {
      * gets all participants in a moodle course with optional role filtering
      * returns array of user->email keys and role values
     */
-    function get_roster($onlyrole=null) {
+	function get_roster($onlyrole=null) {
         //edited below, replaced old method
         $coursecontext = context_course::instance($this->courseid);
         $allroles = get_roles_used_in_context($coursecontext);
@@ -1137,13 +1136,28 @@ class repository_morsle extends repository {
         $suspended = get_suspended_userids($coursecontext);
         foreach ($course->users as $cuser) {
             if (array_key_exists($cuser->id, $suspended)) {
-                unset($course->users[$cuser->id]);
+                
+                /* Explanation of changes made: */
+                //edited use of unset below: previous implementation wasn't working
+                //because $cuser->id was a number larger than the size of 
+                //$course->users. 
+                //$course->users is an array of stdClass objects, which have their own IDs, 
+                //but those IDs could not be directly accessed in $course->users without callling on the $cuser object.
+                //So the compiler was seeing $cuser->id as an index into the array $course->users
+                //$cuser->id is normally too large to be used to index into $course->users
+                //unset was not working because the index $cuser->id was out of range (larger than the size of $course->users)
+                //
+                ///*unset($course->users[$cuser->id]);*/
+                //solution has been reimplemented below, and it should now work (hopefully)
+                $deleteUser = array_search($cuser, $course->users);
+                unset($course->users[$deleteUser]);
             } else if ($onlyrole === null || $onlyrole == $allroles[$cuser->roleid]->shortname) {
                 $members[strtolower($cuser->email)] = $allroles[$cuser->roleid]->shortname;
             }
         }
         return $members;
-    }
+    }    
+    
     /*
      * Get aliases so we can avoid constantly adding and deleting them in the activity
     */
@@ -1500,7 +1514,6 @@ class repository_morsle extends repository {
         }
     }
 
-    /**** Not likely to use anymore *****/
     function calmassdelete() {
         global $CFG, $DB, $success;
         //		require_once('../../../config.php');
