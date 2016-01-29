@@ -47,8 +47,10 @@ class morsle_docs extends google_docs{
 			$params[$key] = trim($param);
        	}
 //       	$url .= '?' . implode_assoc('=', '&', $params);
-
+        error_log('$url ' . $url);
+        error_log('$params ' . json_encode($params));
         $content = twolegged($url, $params, 'GET');
+        error_log('content ' . json_encode($content));
 //       	$content = $this->get($url, $params, null);
         $xml = new SimpleXMLElement($content->response);
 

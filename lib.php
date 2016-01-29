@@ -42,7 +42,11 @@ class repository_morsle extends repository {
     private $subauthtoken = '';
 
     public function __construct($repositoryid=9,$context = SYSCONTEXTID, $options = array(), $readonly=0) { 
-
+      try {
+  throw  new Exception(); 
+} catch (Exception $e) {
+    error_log("Caught $e");
+}
         global $USER, $COURSE, $DB;
 
         $this->repositoryid = $repositoryid;
@@ -145,6 +149,61 @@ class repository_morsle extends repository {
         $calendar->setTimeZone('America/Chicago');
         return $this->service->calendars->update($this->useremail,$calendar);
     }
+
+
+    private function get_all_listing($useraccount, $morsleaccount, $deptaccount, $maxfiles = 20, $search_path, $deptstr, $path) {
+        global $OUTPUT, $DB;
+        $ret = array();
+        $user =  $morsleaccount;
+        $search = array(
+                'xoauth_requestor_id' => $user,
+                'showfolders' => 'true',
+                'folder' => 'folder%3Aroot'
+/*                'max-results'=>$maxfiles */
+        );
+        if ($search_path !== null) { // looking for another folder's contents
+            $search['folder'] = $search_path;
+        }
+        $mauth = new morsle_oauth_request(null, null, $search); // subauthtoken ignored
+        $mdocs = new morsle_docs($mauth);
+        $ret['list'] = $mdocs->get_file_list($search, $this);
+            // get user level folders or documents
+        $user = $useraccount;
+        $title = get_string('useraccountstring', 'repository_morsle') . $user;
+        $url = DOCUMENTFEED_URL;
+        $ret['list'][] =  array(
+            'title' => $title,
+            'url' => $url,
+            'source' => $url,
+            'date'   => usertime(strtotime(time())),
+            'children' => array(),
+            'path' => base64_encode('User Files'),
+            'thumbnail' => (string) $OUTPUT->pix_url('f/folder-64')
+        );
+
+        // check to see if we even have a departmental account for this department but don't show the departmental collection if we're already in it indicated by $wdir
+        // TODO: this needs to change if we eliminate morsle table, but if the read-only or writeable folders get renamed then we need the table
+
+        // department account if exists
+
+        $conditions = " shortname = '$deptstr' ";
+        $user = $deptaccount;
+        $title = get_string('deptaccountstring', 'repository_morsle') . $user;
+        if (strpos($path,$deptstr) === false && $is_morsle_dept = $DB->get_record_select('morsle_active', $conditions)) {
+            $ret['list'][] =  array(
+                'title' => $deptstr,
+                'url' => $url,
+                'source' => $url,
+                'date'   => usertime(strtotime(time())),
+                'children' => array(),
+                'path' => base64_encode($deptstr),
+                'thumbnail' => (string) $OUTPUT->pix_url('f/folder-64')
+            );
+        }
+        $ret['path'][]['name'] = 'Morsle Files';
+        return $ret;
+    }
+
     /*
      * here's where the fun is going to start getting google docs for
      * the course
@@ -152,15 +211,14 @@ class repository_morsle extends repository {
      * the department, if exists
      */
     public function get_listing($path='', $page = '', $query = null) {
-	global $CFG, $USER, $OUTPUT, $COURSE, $DB;
-	require_once("$CFG->dirroot/google/constants.php");
-	require_once('course_constants.php');
+        global $CFG, $USER, $OUTPUT, $COURSE, $DB;
+        require_once("$CFG->dirroot/google/constants.php");
+        require_once('course_constants.php');
 
-	$ret = array();
+        $ret = array();
         $ret['dynload'] = true;
         $user = build_user();
         $course = $COURSE;
- //    	$user = $USER->email; // TODO: uncomment
 
         $useraccount = $USER->email;
         $user = $useraccount;
@@ -213,59 +271,9 @@ class repository_morsle extends repository {
         if ($query !== null) {
                 $root_path = 'queryi';
         }
-
         switch ($root_path) {
             case null: // empty: get only the readonly and writeable folders plus any files and user folder and (if available) department folder
-                $user =  $morsleaccount;
-                $search = array(
-                        'xoauth_requestor_id' => $user,
-//			'foldersonly' => 'true', // identifies that we're just looking for the special morsle folders
-                        'showfolders' => 'true',
-                        'folder' => 'folder%3Aroot',
-                        'max-results'=>$maxfiles
-                );
-                if ($search_path !== null) { // looking for another folder's contents
-                        $search['folder'] = $search_path;
-                }
-               $mauth = new morsle_oauth_request(null, null, $search); // subauthtoken ignored
-//		unset($search['repo_id']);
-                $mdocs = new morsle_docs($mauth);
-                $ret['list'] = $mdocs->get_file_list($search, $this);
-                // get user level folders or documents
-                $user = $useraccount;
-                $title = get_string('useraccountstring', 'repository_morsle') . $user;
-                $url = DOCUMENTFEED_URL;
-                $ret['list'][] =  array(
-                    'title' => $title,
-                    'url' => $url,
-                    'source' => $url,
-                    'date'   => usertime(strtotime(time())),
-                    'children' => array(),
-                    'path' => base64_encode('User Files'),
-                    'thumbnail' => (string) $OUTPUT->pix_url('f/folder-64')
-                );
-
-                // check to see if we even have a departmental account for this department but don't show the departmental collection if we're already in it indicated by $wdir
-                // TODO: this needs to change if we eliminate morsle table, but if the read-only or writeable folders get renamed then we need the table
-
-                // department account if exists
-
-                $conditions = " shortname = '$deptstr' ";
-                $user = $deptaccount;
-                $title = get_string('deptaccountstring', 'repository_morsle') . $user;
-                if (strpos($path,$deptstr) === false && $is_morsle_dept = $DB->get_record_select('morsle_active', $conditions)) {
-                    $ret['list'][] =  array(
-                        'title' => $deptstr,
-                        'url' => $url,
-                        'source' => $url,
-                        'date'   => usertime(strtotime(time())),
-                        'children' => array(),
-                        'path' => base64_encode($deptstr),
-                        'thumbnail' => (string) $OUTPUT->pix_url('f/folder-64')
-                    );
-                }
-
-                $ret['path'][]['name'] = 'Morsle Files';
+                $ret = $this->get_all_listing($useraccount, $morsleaccount, $deptaccount, $maxfiles, $search_path, $deptstr, $path);
                 break;
             case 'queryi':
             case 'user f':  // user account google files
